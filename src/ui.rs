@@ -1,7 +1,7 @@
 // src/ui.rs (only used by CLI – isolate inquire here for easy swap with egui)
 
-use inquire::Select;
 use crate::types::{Preset, Result};
+use inquire::Select;
 
 pub enum MenuChoice {
     Preset(Preset),
@@ -42,7 +42,7 @@ pub fn main_menu() -> Result<MenuChoice> {
 
             //early return if user wants out
             if preset == "  Back" {
-                return main_menu();         // jump straight back to the top‑level menu
+                return main_menu(); // jump straight back to the top‑level menu
             }
 
             MenuChoice::Preset(match preset {

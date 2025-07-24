@@ -1,8 +1,8 @@
+use crate::history;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
-use crate::history;
 
 use dirs::download_dir;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -29,12 +29,18 @@ pub type ProgressCb = Option<Box<dyn Fn(f64) + Send + Sync + 'static>>;
 pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
     // ❶ Query yt‑dlp once for the title (no download, very fast)
     let title = std::process::Command::new("yt-dlp")
-    .args(["--print", "title", "--skip-download", "--no-warnings", &opts.url])
-    .stdout(std::process::Stdio::piped())
-    .stderr(std::process::Stdio::null())
-    .output()
-    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-    .unwrap_or_else(|_| opts.url.clone());
+        .args([
+            "--print",
+            "title",
+            "--skip-download",
+            "--no-warnings",
+            &opts.url,
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|_| opts.url.clone());
 
     // ❷ Persist: "<title> - <url>"
     history::log_entry(&title, &opts.url);
@@ -100,7 +106,13 @@ pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
         let re_pct = Regex::new(r"\[download\]\s+([\d\.]+)%").unwrap();
         let pb_clone = pb.clone();
         thread::spawn(move || {
-            for line in reader.lines().flatten() {
+            // FIX: Replace `.flatten()` with an explicit loop to handle errors.
+            for line_result in reader.lines() {
+                let line = match line_result {
+                    Ok(line) => line,
+                    Err(_) => continue, // Skip bad lines
+                };
+
                 if let Some(c) = re_pct.captures(&line) {
                     if let Ok(p) = c[1].parse::<f64>() {
                         pb_clone.set_position(p.round() as u64);

@@ -18,7 +18,8 @@ fn fetch_chapters(url: &str) -> Result<Vec<Chapter>> {
         .stdout;
 
     let raw = String::from_utf8_lossy(&stdout);
-    let re = Regex::new(r"\{'start_time': ([\d.]+), 'title': '([^']+)', 'end_time': ([\d.]+)\}").unwrap();
+    let re = Regex::new(r"\{'start_time': ([\d.]+), 'title': '([^']+)', 'end_time': ([\d.]+)\}")
+        .unwrap();
 
     Ok(re
         .captures_iter(&raw)
@@ -33,14 +34,24 @@ fn fetch_chapters(url: &str) -> Result<Vec<Chapter>> {
 pub fn run() -> Result<()> {
     use inquire::Text;
     let url = Text::new("Enter video URL (or leave blank to go back):").prompt()?;
-    if url.trim().is_empty() { return Ok(()); }
+    if url.trim().is_empty() {
+        return Ok(());
+    }
 
     // ask for format (Best | Manual)
-    let format = match Select::new("\nSelect download format:", vec!["Best (default)", "Enter manually"]).prompt()? {
+    let format = match Select::new(
+        "\nSelect download format:",
+        vec!["Best (default)", "Enter manually"],
+    )
+    .prompt()?
+    {
         "Best (default)" => None,
         _ => {
             println!("\n📦 Available formats:\n");
-            Command::new("yt-dlp").args(["--list-formats", &url]).status().ok();
+            Command::new("yt-dlp")
+                .args(["--list-formats", &url])
+                .status()
+                .ok();
             println!("💡 e.g. '137+140' or 'bestvideo+bestaudio'\n");
             Text::new("Format string:").prompt().ok()
         }
@@ -62,7 +73,13 @@ pub fn run() -> Result<()> {
     let ranges: Vec<String> = chapters
         .into_iter()
         .filter(|c| picked.contains(&c.title))
-        .map(|c| format!("*{}-{}", util::seconds_to_hms(c.start), util::seconds_to_hms(c.end)))
+        .map(|c| {
+            format!(
+                "*{}-{}",
+                util::seconds_to_hms(c.start),
+                util::seconds_to_hms(c.end)
+            )
+        })
         .collect();
 
     println!("\n📥 Downloading selected chapters as separate files…\n");
