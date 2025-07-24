@@ -1,0 +1,146 @@
+# .github/workflows/ci-release.yml
+# This workflow combines comprehensive CI with an efficient release process.
+#
+# CI (on push/pull_request to main):
+# 1. Checks formatting and lints code.
+# 2. Builds and runs tests NATIVELY on Linux, Windows, and macOS.
+#
+# Release (on push of a 'v*.*.*' tag):
+# 1. Waits for all native tests to pass.
+# 2. Builds release binaries for all 3 platforms using 'cross' on a single runner for speed.
+# 3. Packages the binaries and creates a GitHub Release.
+
+name: Build, Test, and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*" # Trigger on version tags
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ==================================================================
+  #  CI Part 1: Fast checks for formatting and linting
+  # ==================================================================
+  check:
+    name: Check & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy (linter)
+        run: cargo clippy --all-targets -- -D warnings
+
+  # ==================================================================
+  #  CI Part 2: Native builds and tests on all platforms
+  # ==================================================================
+  build_and_test:
+    name: Native Test on ${{ matrix.os }}
+    needs: check
+    strategy:
+      # Do not cancel other jobs if one fails
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # Note: The windows-latest runner has the necessary tools for build.rs
+      # to compile resource files (.rc) if you use a crate like `embed-resource`.
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Run tests
+        run: cargo test --verbose
+
+  # ==================================================================
+  #  Release Part: Create release binaries only when a tag is pushed
+  # ==================================================================
+  release:
+    name: Create Release
+    # This job only runs when a tag is pushed
+    if: startsWith(github.ref, 'refs/tags/v')
+    # It requires all native tests to pass first
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create a GitHub release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          override: true
+
+      - name: Install cross-compilation tool
+        run: cargo install cross
+
+      - name: Cache dependencies for cross-compilation
+        # Cache is separated to avoid conflicts with native build caches
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: "cross-compile"
+
+      - name: Get version from tag
+        id: get_version
+        # Extracts '1.2.3' from 'refs/tags/v1.2.3'
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Build release binaries with cross
+        run: |
+          cross build --release --target x86_64-unknown-linux-gnu
+          cross build --release --target x86_64-pc-windows-gnu
+          cross build --release --target x86_64-apple-darwin
+
+      - name: Prepare binaries for release
+        run: |
+          # Create a distribution directory
+          mkdir dist
+
+          # Package Linux binary
+          cp target/x86_64-unknown-linux-gnu/release/ytdownloader dist/ytdownloader-linux-x64
+          zip dist/ytdownloader-v${{ env.VERSION }}-linux-x64.zip -j dist/ytdownloader-linux-x64
+
+          # Package Windows binary
+          cp target/x86_64-pc-windows-gnu/release/ytdownloader.exe dist/ytdownloader-windows-x64.exe
+          zip dist/ytdownloader-v${{ env.VERSION }}-windows-x64.zip -j dist/ytdownloader-windows-x64.exe
+
+          # Package macOS binary
+          cp target/x86_64-apple-darwin/release/ytdownloader dist/ytdownloader-macos-x64
+          zip dist/ytdownloader-v${{ env.VERSION }}-macos-x64.zip -j dist/ytdownloader-macos-x64
+
+      - name: Create GitHub Release and Upload Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          # This will upload all .zip files from the dist directory
+          files: dist/*.zip
