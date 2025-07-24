@@ -13,13 +13,9 @@ fn main() {
 
     // Compile ytdownloader.rc into .res using windres
     let status = Command::new("x86_64-w64-mingw32-windres")
-    .args([
-        "ytdownloader.rc",
-        "-O", "coff",
-        "-o", "ytdownloader.res",
-    ])
-    .status()
-    .expect("Failed to run windres");
+        .args(["ytdownloader.rc", "-O", "coff", "-o", "ytdownloader.res"])
+        .status()
+        .expect("Failed to run windres");
 
     assert!(status.success(), "windres failed");
 

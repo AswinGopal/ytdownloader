@@ -1,6 +1,6 @@
-use inquire::Text;
 use crate::types::{DlOpts, Result};
 use crate::yt;
+use inquire::Text;
 
 pub fn run() -> Result<()> {
     let url = Text::new("Enter video URL (or leave blank to go back):").prompt()?;
@@ -9,7 +9,11 @@ pub fn run() -> Result<()> {
     }
 
     println!("\n📦 Fetching format list...\n");
-    std::process::Command::new("yt-dlp").arg("-F").arg(&url).status().ok();
+    std::process::Command::new("yt-dlp")
+        .arg("-F")
+        .arg(&url)
+        .status()
+        .ok();
 
     let fmt = Text::new("\nEnter format code (e.g. 137+140):").prompt()?;
 
