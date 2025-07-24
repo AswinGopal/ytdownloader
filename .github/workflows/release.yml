@@ -15,7 +15,7 @@ jobs:
   # Job to build for Windows
   build-windows:
     name: Build for Windows (x86_64)
-    runs-on: ubuntu-latest # Use a Linux host
+    runs-on: ubuntu-latest
     steps:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
@@ -36,36 +36,6 @@ jobs:
         with:
           name: ytdownloader-windows-x86_64
           path: target/x86_64-pc-windows-gnu/release/ytdownloader.exe
-
-  # Job to build for macOS
-  build-macos:
-    name: Build for macOS (x86_64)
-    runs-on: ubuntu-latest # Use a Linux host
-    steps:
-      - name: ⬇️ Checkout code
-        uses: actions/checkout@v4
-
-      - name: ⚙️ Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: x86_64-apple-darwin
-
-      - name: 🔧 Install osxcross macOS cross-compiler
-        uses: actions-rs/osxcross@v1
-        with:
-          target: x86_64-apple-darwin
-
-      - name: 🚀 Build for macOS
-        run: cargo build --release --target x86_64-apple-darwin
-
-      - name: 🔬 Strip macOS binary
-        run: strip -S target/x86_64-apple-darwin/release/ytdownloader
-
-      - name: 📦 Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ytdownloader-macos-x86_64
-          path: target/x86_64-apple-darwin/release/ytdownloader
 
   # Job to build for Linux
   build-linux:
