@@ -50,16 +50,33 @@ jobs:
         with:
           target: x86_64-apple-darwin
 
-      - name: 🔧 Install macOS cross-compilation toolchain
+      - name: 🔧 Install osxcross macOS cross-compiler
         run: |
+          # Install dependencies for osxcross
           sudo apt-get update
-          sudo apt-get install -y clang libssl-dev zlib1g-dev
+          sudo apt-get install -y clang patch libxml2-dev libssl-dev
+
+          # Clone osxcross and build it
+          git clone https://github.com/tpoechtrager/osxcross.git
+          cd osxcross
+          wget -q https://s3.dockerproject.org/darwin/v2/MacOSX10.11.sdk.tar.xz
+          tar -xf MacOSX10.11.sdk.tar.xz
+          UNATTENDED=1 ./build.sh
+
+          # Add the new compiler to the PATH
+          echo "$(pwd)/target/bin" >> $GITHUB_PATH
+
+      - name: ⚙️ Configure Cargo for cross-compilation
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml <<EOF
+          [target.x86_64-apple-darwin]
+          linker = "x86_64-apple-darwin20.4-clang"
+          ar = "x86_64-apple-darwin20.4-ar"
+          EOF
 
       - name: 🚀 Build for macOS
-        run: |
-          export CFLAGS_x86_64_apple_darwin="-I/usr/include/x86_64-linux-gnu"
-          export LDFLAGS_x86_64_apple_darwin="-L/usr/lib/x86_64-linux-gnu"
-          cargo build --release --target x86_64-apple-darwin
+        run: cargo build --release --target x86_64-apple-darwin
 
       - name: 📦 Upload macOS artifact
         uses: actions/upload-artifact@v4
