@@ -21,12 +21,12 @@ fn latest_version() -> Result<String> {
     );
     let client = Client::builder().default_headers(headers).build()?;
     let resp: Json = client
-    .get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
-    .send()?
-    .json()?;
+        .get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+        .send()?
+        .json()?;
     let tag = resp["tag_name"]
-    .as_str()
-    .ok_or_else(|| anyhow::anyhow!("tag_name missing"))?;
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("tag_name missing"))?;
     Ok(tag.trim_start_matches("yt-dlp ").to_owned())
 }
 
@@ -43,10 +43,10 @@ pub fn check_and_update() -> Result<()> {
 
     println!("⬆️  New yt-dlp version available: {} → updating…", latest);
     let status = Command::new("yt-dlp")
-    .arg("-U")
-    .stdout(Stdio::null())
-    .stderr(Stdio::null())
-    .status()?;
+        .arg("-U")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
     anyhow::ensure!(status.success(), "yt-dlp updater failed: {:?}", status);
     println!("✅ Updated yt-dlp from {} to {}.", current, latest);
     Ok(())
