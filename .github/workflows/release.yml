@@ -1,0 +1,88 @@
+# .github/workflows/release.yml
+
+name: Cross-Platform Release Build
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch: {}
+
+  # Triggers the workflow on a push to any tag (e.g., v1.0.0)
+  push:
+    tags:
+      - '*' # This will match any tag
+
+jobs:
+  # Job to build for Windows
+  build-windows:
+    name: Build for Windows (x86_64)
+    runs-on: ubuntu-latest # Use a Linux host
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-pc-windows-gnu
+
+      - name: 🔧 Install MinGW for windres
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64
+
+      - name: 🚀 Build for Windows
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: 📦 Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ytdownloader-windows-x86_64
+          path: target/x86_64-pc-windows-gnu/release/ytdownloader.exe
+
+  # Job to build for macOS
+  build-macos:
+    name: Build for macOS (x86_64)
+    runs-on: ubuntu-latest # Use a Linux host
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-apple-darwin
+
+      - name: 🔧 Install macOS cross-compilation toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev zlib1g-dev
+
+      - name: 🚀 Build for macOS
+        run: |
+          export CFLAGS_x86_64_apple_darwin="-I/usr/include/x86_64-linux-gnu"
+          export LDFLAGS_x86_64_apple_darwin="-L/usr/lib/x86_64-linux-gnu"
+          cargo build --release --target x86_64-apple-darwin
+
+      - name: 📦 Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ytdownloader-macos-x86_64
+          path: target/x86_64-apple-darwin/release/ytdownloader
+
+  # Job to build for Linux
+  build-linux:
+    name: Build for Linux (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: 🚀 Build for Linux
+        run: cargo build --release
+
+      - name: 📦 Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ytdownloader-linux-x86_64
+          path: target/release/ytdownloader
