@@ -29,21 +29,18 @@ pub type ProgressCb = Option<Box<dyn Fn(f64) + Send + Sync + 'static>>;
 pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
     // ❶ Query yt‑dlp once for the title (no download, very fast)
     let title = std::process::Command::new("yt-dlp")
-        .args([
-            "--print",
-            "title",
-            "--skip-download",
-            "--no-warnings",
-            &opts.url,
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|_| opts.url.clone());
-
-    // ❷ Persist: "<title> - <url>"
-    history::log_entry(&title, &opts.url);
+    .args([
+        "--print",
+        "title",
+        "--skip-download",
+        "--no-warnings",
+        &opts.url,
+    ])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::null())
+    .output()
+    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    .unwrap_or_else(|_| opts.url.clone());
 
     let clipping = opts.sections.is_some();
     let template = output_template(clipping);
@@ -64,32 +61,31 @@ pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
     args.extend(opts.extra.clone());
     args.push(opts.url.clone());
 
-    if clipping {
+    let status = if clipping {
         // Spinner‑only mode
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::with_template("{spinner} ⏬ Downloading with yt-dlp…")
-                .unwrap()
-                .tick_chars("⠂⠒⠒⠤⠤⠂"),
+            .unwrap()
+            .tick_chars("⠂⠒⠒⠤⠤⠂"),
         );
         pb.enable_steady_tick(Duration::from_millis(120));
 
         let status = Command::new("yt-dlp")
-            .args(&args)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        .args(&args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
 
         pb.finish_and_clear();
-        anyhow::ensure!(status.success(), "yt-dlp exited with {:?}", status);
-        Ok(())
+        status
     } else {
         // Full progress‑bar mode
         let mut child = Command::new("yt-dlp")
-            .args(&args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()?;
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()?;
 
         let stdout = child.stdout.take().expect("capture stdout");
         let reader = BufReader::new(stdout);
@@ -97,8 +93,8 @@ pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
         let pb = ProgressBar::new(100);
         pb.set_style(
             ProgressStyle::with_template("{bar:40.cyan/blue} {pos:>3}% {msg}")
-                .unwrap()
-                .progress_chars("=>-"),
+            .unwrap()
+            .progress_chars("=>-"),
         );
         pb.set_message("Downloading…");
         pb.enable_steady_tick(Duration::from_millis(120));
@@ -110,9 +106,8 @@ pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
             for line_result in reader.lines() {
                 let line = match line_result {
                     Ok(line) => line,
-                    Err(_) => continue, // Skip bad lines
+                      Err(_) => continue, // Skip bad lines
                 };
-
                 if let Some(c) = re_pct.captures(&line) {
                     if let Ok(p) = c[1].parse::<f64>() {
                         pb_clone.set_position(p.round() as u64);
@@ -123,10 +118,15 @@ pub fn run(opts: DlOpts, progress: ProgressCb) -> Result<()> {
 
         let status = child.wait()?;
         pb.finish_and_clear();
-        anyhow::ensure!(status.success(), "yt-dlp exited with {:?}", status);
         if let Some(cb) = progress {
             cb(100.0);
         }
-        Ok(())
-    }
+        status
+    };
+
+    // ❷ Persist: "<title> - <url>" only after a successful download
+    anyhow::ensure!(status.success(), "yt-dlp exited with {:?}", status);
+    history::log_entry(&title, &opts.url);
+
+    Ok(())
 }
